@@ -1,0 +1,79 @@
+#!/usr/bin/env python
+# Needs divider functionality
+
+import os, re, sys
+
+# Markdown templates
+md = {
+	'chapter': '# ',
+	'bookmark': '## ',
+	'divider': '---'
+}
+
+# Find all `txt` files in folder
+txt_regex = re.compile(r'.*\.txt')
+pwd = os.path.dirname(os.path.abspath(__file__))
+
+if (len(sys.argv) == 2):
+	valid_txts = [sys.argv[1]]
+else:
+	valid_txts  = [item for item in os.listdir(pwd) if txt_regex.match(item)]
+
+# Get camel cased version of string for Obsidian tags
+def to_camel_case(string):
+	return ''.join([word.capitalize() for word in string.split()])
+
+# Get divider of comment, since Moon Reader adds note for a quote as `Quote (Your comment)`
+def get_comment_divider(line):
+	letter_array = list(line[::-1])
+	level = 0
+
+	for i in enumerate(letter_array):
+		if i[1] == ')':
+			level += 1
+		elif i[1] == '(':
+			level -= 1
+		if level == 0:
+			return len(line) - i[0]
+								
+for file in valid_txts:
+	content = open(file).read()
+	
+	quote_array = content.split('\n')[4:]
+
+	# Regex removes metadata after bookname in first line, that has name and author, then it gets split
+	# First element: Book name
+	# Last element: Author
+	file_title_split = re.sub("[\(\[].*?[\)\]]", "", content.partition('\n')[0]).strip().split(' - ')
+	if len(file_title_split) == 1:
+		print(f'{file} is not valid')
+		continue
+
+	# Create tags for Obsidian
+	markdown = [f'Tags: #{to_camel_case(file_title_split[-1])} #{to_camel_case(file_title_split[0])}']
+
+	for line in quote_array:
+		if line == '':
+			continue
+		# Chapter name case
+		elif line[0] == '◆':
+			markdown.append(re.sub(r"◆\ ", md['chapter'], line))
+		# Bookmark case
+		elif line[0] == '▪':
+			if line[-1] == ')':
+				divider = get_comment_divider(line)
+				markdown.append(re.sub(r"▪️\ ", md['bookmark'], line[:divider - 1].strip()))
+				markdown.append('_' + line[divider : -1] + '_')
+			else:
+				markdown.append(re.sub(r"▪️\ ", md['bookmark'], line))
+		# Multiline bookmark case
+		else:
+			if line[-1] == ')':
+				divider = get_comment_divider(line)
+				markdown[-1] = markdown[-1] + ' ' + (line[:divider - 1].strip())
+				markdown.append('_' + line[divider : -1] + '_')
+			else:
+				markdown[-1] = markdown[-1] + ' ' + (line)
+
+	with open(f"{file_title_split[-1]} - {file_title_split[0]}.md", "w") as text_file:
+		text_file.write('\n'.join(markdown))
