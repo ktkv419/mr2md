@@ -1,12 +1,10 @@
 #!/usr/bin/env python
-# Needs divider functionality
-
 import os, re, sys
 
 # Markdown templates
 md = {
-	'chapter': '# ',
-	'bookmark': '## ',
+	'chapter': '## ',
+	'bookmark': '##### ',
 	'divider': '---'
 }
 
@@ -22,6 +20,12 @@ else:
 # Get camel cased version of string for Obsidian tags
 def to_camel_case(string):
 	return ''.join([word.capitalize() for word in string.split()])
+	
+def add_dividers(markdown):
+	for quote in enumerate(markdown):
+		if quote[1][:len(md['bookmark'])] == md['bookmark'] and markdown[quote[0] - 1][:len(md['chapter'])] != md['chapter']:
+			markdown[quote[0]] = '\n---\n' + markdown[quote[0]]
+	return markdown
 
 # Get divider of comment, since Moon Reader adds note for a quote as `Quote (Your comment)`
 def get_comment_divider(line):
@@ -61,19 +65,21 @@ for file in valid_txts:
 		# Bookmark case
 		elif line[0] == '▪':
 			if line[-1] == ')':
+				print(line)
 				divider = get_comment_divider(line)
-				markdown.append(re.sub(r"▪️\ ", md['bookmark'], line[:divider - 1].strip()))
+				markdown.append(re.sub(r"▪\ ", md['bookmark'], line[:divider - 1].strip()))
 				markdown.append('_' + line[divider : -1] + '_')
 			else:
-				markdown.append(re.sub(r"▪️\ ", md['bookmark'], line))
+				markdown.append(re.sub(r"▪\ ", md['bookmark'], line))
 		# Multiline bookmark case
 		else:
-			if line[-1] == ')':
-				divider = get_comment_divider(line)
-				markdown[-1] = markdown[-1] + ' ' + (line[:divider - 1].strip())
-				markdown.append('_' + line[divider : -1] + '_')
+			if line[-1] == ')' and get_comment_divider(line) == None:
+				big_comment = markdown[-1] + line
+				divider = get_comment_divider(big_comment)
+				markdown[-1] = (big_comment[:divider - 1].strip())
+				markdown.append('_' + big_comment[divider : -1] + '_')
 			else:
 				markdown[-1] = markdown[-1] + ' ' + (line)
 
 	with open(f"{file_title_split[-1]} - {file_title_split[0]}.md", "w") as text_file:
-		text_file.write('\n'.join(markdown))
+		text_file.write('\n'.join(add_dividers(markdown)))
